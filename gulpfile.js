@@ -2,11 +2,13 @@ import gulp from 'gulp';
 import { deleteAsync } from 'del';
 import htmlmin from 'gulp-htmlmin';
 import gulpIf from 'gulp-if';
+
 import concat from 'gulp-concat';
 import autoprefixer from 'gulp-autoprefixer';
 import clean from 'gulp-clean-css';
 import dartSass from 'sass';
 import gulpSass from 'gulp-sass';
+import imagemin, { mozjpeg, optipng, svgo } from 'gulp-imagemin';
 import gulpSquoosh from 'gulp-squoosh';
 import gulpCache from 'gulp-cache';
 import babel from 'gulp-babel';
@@ -21,8 +23,10 @@ const DEV = process.argv.includes('--prod');
 const del = async () => {
   !(await deleteAsync(['dist/**']));
 };
-
-const htmlMinify = () => {
+const ico = () => {
+  return gulp.src('src/favicon/*.ico').pipe(gulp.dest('dist/favicon'));
+};
+function htmlMinify() {
   return gulp
     .src('src/**/*.html')
     .pipe(htmlmin({ collapseWhitespace: true }))
@@ -32,39 +36,49 @@ const htmlMinify = () => {
 }
 
 const styles = () => {
-  return (
-    gulp
-      .src('src/scss/style.scss')
-      .pipe(gulpIf(!DEV, sourceMaps.init()))
-      .pipe(sass({ outputStyle: 'compressed' }))
-      .pipe(concat('styles.min.css'))
-      .pipe(
-        autoprefixer({
-          cascade: false,
-        })
-      )
-      .pipe(gulpIf(!DEV, clean({ level: 2 })))
-      .pipe(gulpIf(!DEV, sourceMaps.write()))
-      .pipe(gulp.dest('dist/css'))
-      .pipe(gulpIf(!DEV, sync.stream()))
-  );
+  return gulp
+    .src('src/scss/**/*.scss')
+    .pipe(gulpIf(!DEV, sourceMaps.init()))
+    .pipe(sass({ outputStyle: 'compressed' }))
+    .pipe(concat('styles.min.css'))
+    .pipe(
+      autoprefixer({
+        cascade: false,
+      })
+    )
+    .pipe(gulpIf(!DEV, clean({ level: 2 })))
+    .pipe(gulpIf(!DEV, sourceMaps.write()))
+    .pipe(gulp.dest('dist/css'))
+    .pipe(gulpIf(!DEV, sync.stream()));
 };
 const processImages = () => {
-  return gulp
-    .src('src/img/**')
-    .pipe(
-      gulpCache(
-        gulpSquoosh(() => ({
-          encodeOptions: {
-            mozjpeg: {},
-            webp: {},
-            oxipng: {},
-          },
-        }))
+  return (
+    gulp
+      .src('src/img/**')
+      //   .pipe(
+      //     gulpCache(
+      //       gulpSquoosh(() => ({
+      //         encodeOptions: {
+      //            mozjpeg: {},
+      //            webp: {},
+      //           oxipng: {},
+      //         },
+      //       }))
+      //     )
+      //   )
+      .pipe(
+        imagemin([
+          imagemin.mozjpeg({ quality: 75, progressive: true }),
+          imagemin.optipng({ optimizationLevel: 5 }),
+          imagemin.svgo({
+            plugins: [{ removeViewBox: true }, { cleanupIDs: false }],
+          }),
+        ])
       )
-    )
-    .pipe(gulp.dest('dist/images'))
-    .pipe(gulpIf(!DEV, sync.stream()));
+
+      .pipe(gulp.dest('dist/images'))
+      .pipe(gulpIf(!DEV, sync.stream()))
+  );
 };
 
 const scripts = () => {
@@ -97,4 +111,4 @@ gulp.watch('src/scss/**/*.scss', styles);
 gulp.watch('src/js/**/*.js', scripts);
 gulp.watch('src/img**', processImages);
 
-export default gulp.series(del, htmlMinify, styles, scripts, processImages, watchFiles);
+export default gulp.series(del, ico, htmlMinify, styles, scripts, processImages, watchFiles);
